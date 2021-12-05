@@ -16,26 +16,26 @@ const char* password = "00436035103";
 //const char* password = "00436035103";
 //const char* ssid = "iPhone de Facundo";
 //const char* password = "Facu1234";
-//const char* ssid = "iPhone de Leila Sofia";
-//const char* password = "d0wkf62f3n4zo";
+//const char* ssid = "sc-121b";
+//const char* password = "QWNWQTMQMMJN";
+
+bool dig1 = true;
+bool dig2 = true;
 
 WiFiServer server(80);
 
-// Variable to store the HTTP request
-String header;
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0; 
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 1000;
+String header;// Variable to store the HTTP request
+unsigned long currentTime = millis();// Current time
+unsigned long previousTime = 0; // Previous time
+const long timeoutTime = 1000;// Define timeout time in milliseconds
+const int output5 = 4;
+const int output4 = 5;
 
 void setup() {
-  
   Serial.begin(115200);
   delay(10);
   
-  sensor.begin();
+  sensor.begin(); 
   
   IPAddress ip(192, 168, 10, 200);
   IPAddress gateway(192, 168, 0, 1);
@@ -44,7 +44,11 @@ void setup() {
   
   WiFi.config(ip, gateway, subnet,dns);
   WiFi.begin(ssid, password);
-  
+
+  pinMode(output5, OUTPUT);
+  pinMode(output4, OUTPUT);
+  digitalWrite(output5, HIGH);
+  digitalWrite(output4, HIGH);
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -63,7 +67,8 @@ void setup() {
 }
 
 void loop() {
-  WiFiClient client;
+  
+
   float temperatura = 0;
   float corriente = 0;
   int count = 0;
@@ -76,12 +81,22 @@ void loop() {
   Serial.println("Temperatura: "+ (String)temperatura );
   Serial.println("Corriente: "+ (String)Ip);
   Serial.println("Lectura analog: " + (String)analogRead(A0));
+  
   while (count < 1500){
     webServerFunc();
     delay(10);
     count += 1;
   }
-  if (client.connect(apiServer,80)) {
+  
+  webClientFunc(temperatura,Ip);
+
+}
+
+
+void webClientFunc(float temperatura, float Ip){
+  WiFiClient client;
+  
+    if (client.connect(apiServer,80)) {
     String postStr = apiKey;
     postStr +="&field1=";
     postStr += String((float)temperatura);
@@ -98,13 +113,13 @@ void loop() {
     client.print("\n\n");
     client.print(postStr);
     Serial.println("% send to Thingspeak");
-  }
+    }
   Serial.println("Waiting…");
   client.stop();
-}
+  }
 
-void webServerFunc(void){
-  
+
+void webServerFunc(){
     WiFiClient webClient = server.available();;
     if (webClient.connected()) {// If a new client connects,
     Serial.println("New Client.");          // print a message out in the serial port
@@ -115,6 +130,7 @@ void webServerFunc(void){
       currentTime = millis();         
       if (webClient.available()) {             // if there's bytes to read from the client,
         char c = webClient.read();             // read a byte, then
+        
         Serial.write(c);                    // print it out the serial monitor
         header += c;
         if (c == '\n') {                    // if the byte is a newline character
@@ -123,6 +139,7 @@ void webServerFunc(void){
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
+
             webClient.println("HTTP/1.1 200 OK");
             webClient.println("Content-type:text/html");
             webClient.println("Connection: close");
@@ -131,23 +148,73 @@ void webServerFunc(void){
             // Display the HTML web page
             webClient.println("<!DOCTYPE html><html>");
             webClient.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, height=device-heigth, viewport-fit=cover\" >");//<meta name="viewport" content="width=device-width, initial-scale=1.0, height=device-heigth, viewport-fit=cover">
-            webClient.println("<meta http-equiv=\"refresh\" content=\"20\">");
+            webClient.println("<title>Medidor de sistema de refrigeracion</title>");
+            //webClient.println("<meta http-equiv=\"refresh\" content=\"20\">");
             webClient.println("<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">");
             webClient.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons 
             // Feel free to change the background-color and font-size attributes to fit your preferences
             webClient.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            webClient.println("body{background-color:  #001a33;}");
+            webClient.println("body{background-color: rgb(90, 163, 231);}");
             webClient.println("h1{color:  #ffffff;}p{color:  #ffffff;}");
             webClient.println(".button {border-radius: 50px 50px 50px 50px; background-color: #195B6A; border-style: solid; color: white; padding: 64px 130px;");
             webClient.println("border-style: solid;  border-color: #195B6A;");
             webClient.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
             webClient.println(".button2 {background-color: #001a33;padding: 64px 115px;}</style></head>");
+
+            // Web Page body
+            webClient.println("<body><h1>Control de temperatura de sistea de refrigeracion</h1>");
+            webClient.println("<div><iframe width=\"450\" height=\"260\" style=\"border: 1px solid #cccccc;\" src=\"https://thingspeak.com/channels/1561382/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=10&title=Temperatura+ambiente&type=line&xaxis=Tiempo&yaxis=Grados\"></iframe></div>");
+            webClient.println("<br>");
+            webClient.println("<h1>Canal de control de corriente</h1>");
+            webClient.println("<div><iframe width=\"450\" height=\"260\" style=\"border: 1px solid #cccccc;\" src=\"https://thingspeak.com/channels/1561382/charts/2?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=10&title=Monitor+de+corriente&type=line\"></iframe></div>");
+            webClient.println("<br>");
+
+
+            if (header.indexOf("GET /1/on") >= 0) {
+                digitalWrite(output5,  LOW);
+                dig1 = true;
+                
+              }
+            if (header.indexOf("GET /1/off") >= 0) {  
+                digitalWrite(output5, HIGH);
+                dig1 = false;
+              }
+
+            if (dig1 == false){
+                webClient.println("<p><a href=\"/1/on\"><button id=\"btn1\" class=\"button\">Activar salida 1</button></a></p>");
+              }
+            if (dig1 == true){
+                webClient.println("<p><a href=\"/1/off\"><button id=\"btn1\" class=\"button\">Desactivar salida 1</button></a></p>");
+            }
             
-            // Web Page Heading
-            webClient.println("<body><h1>Control manual del port&oacuten</h1>");
+            if (header.indexOf("GET /2/on") >= 0) {
+                digitalWrite(output4, LOW);
+                dig2 = true;
+                
+              }
+            if (header.indexOf("GET /2/off") >= 0) {  
+                digitalWrite(output4, HIGH);
+                dig2 = false;
+              }
+
+            if (dig2 == false){
+                webClient.println("<p><a href=\"/2/on\"><button id=\"btn2\" class=\"button\">Activar salida 2</button></a></p>");
+              }
+            if (dig2 == true){
+                webClient.println("<p><a href=\"/2/off\"><button id=\"btn2\" class=\"button\">Desactivar salida 2</button></a></p>");
+            }
+            
             webClient.println("</body></html>");
             webClient.println();
+            
+            // Web Page body
+            //webClient.println("<body><h1>Control de temperatura de sistea de refrigeracion</h1><canvas id=\"myChart\" width=\"400\" height=\"400\"></canvas>");
+            //webClient.println("</body>");
+            //webClient.println("<script>const myChart = new Chart(document.getElementById('myChart').getContext(\"2d\"), {type: 'line', data: {datasets: [{label: 'Control de sistema de refrigeracion',"); 
+            //webClient.println("data:[" + data + "],}]}, borderColor: ['rgb(255, 99, 132)'], borderWidth: 3, options: { scales: { y: {beginAtZero: true}}}}); </script>");
+            //webClient.println("</html>");
+            //webClient.println();
             // Break out of the while loop
             break;
           } else { // if you got a newline, then clear currentLine
